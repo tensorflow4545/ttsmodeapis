@@ -70,6 +70,53 @@ app.post('/api/text-to-speech', (req, res) => {
     });
 });
 
+// New route for Indic-Parler-TTS
+app.post('/api/indic-parler-tts', (req, res) => {
+    const { prompt, description = "A neutral tone voice with a clear speech quality." } = req.body;
+
+    // Validate prompt input
+    if (!prompt) {
+        return res.status(400).json({ error: 'Prompt is required for Indic-Parler-TTS' });
+    }
+
+    // Generate a unique filename for the output
+    const outputFilename = `indic_parler_tts_${Date.now()}.wav`;
+    const outputPath = path.join(process.cwd(), outputFilename);
+
+    // Spawn the Python process
+    const pythonProcess = spawn('python', [
+        './models/bharatTTS.py',
+        prompt,
+        description,
+        outputPath
+    ]);
+
+    // Log standard output
+    pythonProcess.stdout.on('data', (data) => {
+        console.log(`Output: ${data.toString()}`);
+    });
+
+    // Handle process completion
+    pythonProcess.on('close', (code) => {
+        if (code === 0) {
+            // Check if the file exists
+            if (fs.existsSync(outputPath)) {
+                // Send the audio file
+                res.download(outputPath, outputFilename, (err) => {
+                    // Clean up the file after sending
+                    if (!err) {
+                        fs.unlinkSync(outputPath);
+                    }
+                });
+            } else {
+                res.status(500).json({ error: 'Audio file was not generated' });
+            }
+        } else {
+            res.status(500).json({ error: 'Failed to process Indic-Parler-TTS' });
+        }
+    });
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
