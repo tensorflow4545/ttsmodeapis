@@ -5,7 +5,6 @@ from parler_tts import ParlerTTSForConditionalGeneration
 from transformers import AutoTokenizer
 import soundfile as sf
 
-# Determine the device (GPU or CPU)
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 # Load the model and tokenizers
@@ -16,7 +15,7 @@ try:
     description_tokenizer = AutoTokenizer.from_pretrained(model.config.text_encoder._name_or_path)
     print("Model and tokenizers loaded successfully.")
 except Exception as e:
-    print(f"Error loading model or tokenizers: {e}")
+    print(f"Error loading model or tokenizers: {e}", file=sys.stderr)
     sys.exit(1)
 
 def main():
@@ -63,7 +62,7 @@ def main():
         print(f"Audio file saved successfully: {output_file}")
 
     except Exception as e:
-        print(f"Error during execution: {e}")
+        print(f"Error during execution: {e}", file=sys.stderr)
         sys.exit(1)
 
 if __name__ == "__main__":

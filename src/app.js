@@ -74,6 +74,8 @@ app.post('/api/text-to-speech', (req, res) => {
 app.post('/api/indic-parler-tts', (req, res) => {
     const { prompt, description = "A neutral tone voice with a clear speech quality." } = req.body;
 
+    console.log('Received TTS Request:', { prompt, description });
+
     // Validate prompt input
     if (!prompt) {
         return res.status(400).json({ error: 'Prompt is required for Indic-Parler-TTS' });
@@ -83,21 +85,45 @@ app.post('/api/indic-parler-tts', (req, res) => {
     const outputFilename = `indic_parler_tts_${Date.now()}.wav`;
     const outputPath = path.join(process.cwd(), outputFilename);
 
-    // Spawn the Python process
+    console.log('Output Path:', outputPath);
+
+    // Flag to track if response has been sent
+    let responseSent = false;
+
+    // Set environment variable to disable oneDNN optimizations
+    process.env.TF_ENABLE_ONEDNN_OPTS = '0';
+
+    // Spawn the Python process with the correct path
     const pythonProcess = spawn('python', [
-        './models/bharatTTS.py',
+        'D:\\AllAboutAI\\modelapis\\src\\models\\bharatTTS.py',
         prompt,
         description,
         outputPath
     ]);
 
-    // Log standard output
+    // Capture standard output
     pythonProcess.stdout.on('data', (data) => {
-        console.log(`Output: ${data.toString()}`);
+        console.log(`STDOUT: ${data.toString().trim()}`);
+    });
+
+    // Capture standard error
+    pythonProcess.stderr.on('data', (data) => {
+        const errorMessage = data.toString().trim();
+        console.error(`STDERR: ${errorMessage}`);
+        
+        if (!responseSent) {
+            responseSent = true;
+            return res.status(500).json({ 
+                error: 'Failed to process Indic-Parler-TTS', 
+                details: errorMessage 
+            });
+        }
     });
 
     // Handle process completion
     pythonProcess.on('close', (code) => {
+        console.log(`Python process exited with code ${code}`);
+
         if (code === 0) {
             // Check if the file exists
             if (fs.existsSync(outputPath)) {
@@ -109,10 +135,19 @@ app.post('/api/indic-parler-tts', (req, res) => {
                     }
                 });
             } else {
-                res.status(500).json({ error: 'Audio file was not generated' });
+                if (!responseSent) {
+                    responseSent = true;
+                    res.status(500).json({ error: 'Audio file was not generated' });
+                }
             }
         } else {
-            res.status(500).json({ error: 'Failed to process Indic-Parler-TTS' });
+            if (!responseSent) {
+                responseSent = true;
+                res.status(500).json({ 
+                    error: 'Failed to process Indic-Parler-TTS', 
+                    exitCode: code 
+                });
+            }
         }
     });
 });
